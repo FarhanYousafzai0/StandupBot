@@ -4,11 +4,13 @@
 
 Developer productivity app: **daily standup drafts** from tracked activity (GitHub, Slack, etc.). See **`IMPLEMENTATION_PLAN.md`**.
 
+**Folder layout** (`app/` vs `apps/`): see the **Folder layout** section in **`README.md`**.
+
 ## Stack (this repo)
 
 - **Frontend:** Next.js (App Router) at **repo root** — `app/`, `components/`, `lib/`
-- **Backend:** Express API will live at **`apps/api/`** per plan (when present); set **`NEXT_PUBLIC_API_URL`** in `.env.local` to match
-- **DB / jobs:** MongoDB, Mongoose, `node-cron` (as in plan)
+- **Backend:** Express API in **`apps/api/`** (npm workspace `api`). Set **`NEXT_PUBLIC_API_URL`** in **`.env.local`** (e.g. `http://localhost:5000`). API env: **`apps/api/.env`** from **`.env.example`**
+- **DB / jobs:** MongoDB + Mongoose; `node-cron` added when jobs land (per plan)
 
 ## Must-read files
 

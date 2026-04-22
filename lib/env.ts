@@ -9,3 +9,7 @@ export function getPublicApiUrl(): string {
   }
   return url.replace(/\/$/, "");
 }
+
+export function isApiConfigured(): boolean {
+  return getPublicApiUrl().length > 0;
+}

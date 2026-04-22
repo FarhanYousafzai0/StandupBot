@@ -216,9 +216,13 @@ standupbot/
 
 ## 6. Next action
 
-Start with **Phase 1** (§4): scaffold monorepo, env validation, Mongo, health route, error middleware, CORS.
+**Phases 1–2 (API) are implemented** under **`apps/api`**: health, Zod env, Mongo, CORS, `User` model, `POST /api/auth/register` & `POST /api/auth/login` (JWT 7d), `GET /api/user/me` (Bearer). Monorepo uses **pnpm** (`pnpm-workspace.yaml`); run `pnpm run dev:api` after `apps/api/.env` is set.
 
-When Phase 1 is done, mark it in a tracker (issue checklist) and move to **Phase 2**.
+**Phase 3 (web) done:** Zustand persist auth store, **Axios** + **`lib/api.ts`** (Bearer, **401** → clear session + redirect except `/api/auth/*` via **`skipAuthRedirect`**), **login** / **register** forms, **dashboard** refetches **`GET /api/user/me`** and shows hello + email.
+
+**Phase 4 done:** `Activity` model + **unique** `(userId, dedupKey)`; **Luxon**-style day range in user **timezone**; **GET** `/api/activity/today`, **GET** `/api/activity?date=YYYY-MM-DD`, **POST** `/api/activity`, **DELETE** `/api/activity/:id` (auth). Dashboard **ActivityPanel** (manual log + list + delete).
+
+**Next: Phase 5** — standup + Claude.
 
 ---
 
