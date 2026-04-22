@@ -1,0 +1,28 @@
+---
+description: Build order and API conventions from IMPLEMENTATION_PLAN.md
+alwaysApply: true
+---
+
+# Implementation plan
+
+## Source of truth
+
+Read **`IMPLEMENTATION_PLAN.md`** at the repo root. Follow phases **in order** (Phase 1 → 2 → …) unless a task explicitly says otherwise.
+
+## Conventions (when backend exists)
+
+- API base: `/api/...` on the Express app; Next.js **must not** duplicate route names in a confusing way. Use **`NEXT_PUBLIC_API_URL`** (e.g. `http://localhost:5000`) for client-side requests.
+- Auth: `Authorization: Bearer <token>` for protected routes; handle **401** globally in the client (clear session, redirect to login).
+- errors: expect `{ error: { code, message } }` and correct HTTP status — do not expect `200` with an error in the body.
+- “Today” for standups/activities: user **timezone** and **local calendar day** as defined in the plan; store/query in **UTC** with explicit boundaries.
+
+## Scope discipline
+
+- MVP: no Jira, no VS Code extension, no **Bull/Redis** until the plan says so.
+- New UI screens should match routes in the plan: **dashboard, standup, settings, history**, auth **login/register**.
+
+## Where things live (frontend)
+
+- `app/` — App Router pages and layouts.
+- `components/` — shared UI (and `components/ui` for shadcn when added).
+- `lib/` — API client, auth helpers, date/time helpers; no JSX in `lib` except rare exceptions.

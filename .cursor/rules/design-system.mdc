@@ -1,0 +1,25 @@
+---
+description: StandupBot UI must follow DESIGN.md (Claude-inspired warm editorial system)
+globs: "**/*.{tsx,jsx,css}"
+alwaysApply: true
+---
+
+# Design system (mandatory)
+
+Before adding or changing **UI, layout, or styles**, read the repo root **`DESIGN.md`** and follow it. Do not invent a parallel palette or typography system.
+
+## Non-negotiables
+
+- **Page / canvas:** Parchment background `#f5f4ed` (or theme token `parchment` / `bg-parchment` if defined) — not pure white as full-page default; not cold blue-grays.
+- **Primary CTA / brand moments:** Terracotta `#c96442` only where DESIGN.md says (primary buttons, high-signal accents).
+- **Neutrals:** Warm undertones only (`#4d4c48`, `#5e5d59`, `#87867f`, cream borders) — no cool blue-grays.
+- **Typography:** Serif for headings (weight **500** in spec; use `font-medium` or design token if mapped), sans for UI/body, mono **only** for code. **Georgia** (or project serif variable) is the stand-in for Anthropic Serif; **system-ui** / **Inter**-class sans per DESIGN.md.
+- **Shape:** Rounded radii (8–12px typical buttons/inputs, not sharp tech corners on interactive surfaces).
+- **Depth:** Prefer **ring** / subtle borders; avoid heavy drop shadows; whisper shadow from DESIGN.md for elevated cards if needed.
+- **Focus on inputs:** Accessibility blue `#3898ec` for focus rings per DESIGN.md.
+
+## Implementation
+
+- Global tokens live in **`app/globals.css`** (`@theme` / CSS variables). **Extend the theme** instead of one-off hex in components.
+- For **shadcn/ui** (when present): map components to these tokens, do not use default zinc/slate for brand surfaces.
+- If a new pattern is needed, **add tokens to `globals.css` and a short note in `DESIGN.md`** only if it becomes a recurring pattern.
