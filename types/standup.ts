@@ -20,3 +20,9 @@ export type StandupTodayResponse = {
 };
 
 export type StandupResponse = { standup: Standup };
+
+export type StandupHistoryResponse = {
+  standups: Standup[];
+  /** Pass as `before` to load the next (older) page, or `null` when done */
+  nextBeforeDate: string | null;
+};

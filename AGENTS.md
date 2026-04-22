@@ -8,10 +8,10 @@ Developer productivity app: **daily standup drafts** from tracked activity (GitH
 
 ## Stack (this repo)
 
-- **Frontend:** Next.js (App Router) at **repo root** — `app/`, `components/`, `lib/`
+- **Frontend:** Next.js (App Router) at **repo root** — `app/`, `components/`, `lib/` — dashboard (activity by source), **Settings** (profile + integrations), **History** (paginated standups)
 - **Backend:** Express API in **`apps/api/`** (npm workspace `api`). In **dev**, **`NEXT_PUBLIC_API_URL=http://localhost:3000`** (or empty) so `/api` is **proxied** to Express on 5000 via **`next.config.ts`**. Set **`MONGODB_URI`** and optionally **`MONGODB_URI_DIRECT`** (non-SRV, used when set) in **`apps/api/.env`**
-- **DB / jobs:** MongoDB + Mongoose; **standup text** via **OpenAI** Chat Completions; `node-cron` when jobs land (per plan)
-- **API secrets:** `apps/api/.env` — add **`OPENAI_API_KEY`** (and optional **`OPENAI_MODEL`**, default `gpt-4o-mini`) for `/api/standup/generate`
+- **DB / jobs:** MongoDB + Mongoose; **standup** via **OpenAI**; **GitHub** + **Slack** OAuth; **`node-cron`**: `fetchActivity` (hourly), `generateStandup` (15m, auto-draft + optional Slack DM)
+- **API secrets:** `apps/api/.env` — **`OPENAI_*`**, optional **`GITHUB_*`**, **`SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET`**, **`API_PUBLIC_URL`**
 
 ## Must-read files
 

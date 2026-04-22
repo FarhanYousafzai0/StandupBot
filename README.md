@@ -22,10 +22,11 @@ Implemented today:
 
 Planned next:
 
-- GitHub integration
-- Slack integration and send flow
-- Background jobs for scheduled fetching and draft generation
-- Standup history and settings polish
+- Automated tests (Phase 9), richer Slack channel UX, analytics
+
+Done recently:
+
+- GitHub + Slack integrations; activity feed **by source**; **Settings** profile (timezone, standup time); **History** pagination; **PATCH /user/me**; **GET /standup/history**
 
 ## Repo Layout
 
@@ -84,6 +85,9 @@ Backend:
 3. Optionally set:
    - `MONGODB_URI_DIRECT` if SRV resolution fails
    - `OPENAI_MODEL` to override the default `gpt-4o-mini`
+   - `API_PUBLIC_URL` (default `http://localhost:5000`) — must match the URLs you register in GitHub and Slack
+   - `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` — **Connect GitHub**; callback: `${API_PUBLIC_URL}/api/integrations/github/callback`
+   - `SLACK_CLIENT_ID` and `SLACK_CLIENT_SECRET` — **Connect Slack**; redirect URL: `${API_PUBLIC_URL}/api/integrations/slack/callback` — in the Slack app, set **Bot token scopes** to `chat:write`, `im:write`, and `users:read`
 
 ## Run The Project
 
@@ -127,6 +131,7 @@ Auth:
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `GET /api/user/me`
+- `PATCH /api/user/me` — `name?`, `timezone?` (IANA, e.g. `Europe/Paris`), `standupTime?` (`HH:mm`)
 
 Activity:
 
@@ -138,8 +143,18 @@ Activity:
 Standup:
 
 - `GET /api/standup/today`
+- `GET /api/standup/history?limit=20&before=YYYY-MM-DD` — older pages: pass `before` = `nextBeforeDate` from the previous response
 - `POST /api/standup/generate`
+- `POST /api/standup/:id/send` — body optional `{ "channel": "C…" }` (otherwise DM the connected user)
 - `PUT /api/standup/:id`
+
+Integrations (auth):
+
+- `GET /api/integrations` — list (no token secrets in JSON)
+- `GET /api/integrations/github/authorize` — returns `{ "url" }` for the browser
+- `GET /api/integrations/github/callback` — OAuth redirect (not from axios)
+- `POST /api/integrations/github/sync` — pull latest GitHub events into activity
+- `DELETE /api/integrations/:id` — disconnect
 
 ## Important Project Docs
 
@@ -151,8 +166,8 @@ Standup:
 ## Notes
 
 - `today` is based on the user's local calendar day, not just server time
-- Standup generation currently depends on manual activity entries unless you add the upcoming integrations
-- GitHub and Slack are product goals in this repo, but their integrations are not fully implemented yet
+- With GitHub connected, recent events are also ingested (hourly; use **Sync now** in Settings to force)
+- Slack send is not implemented yet; see `IMPLEMENTATION_PLAN.md` Phase 7
 
 ## Suggested GitHub Description
 

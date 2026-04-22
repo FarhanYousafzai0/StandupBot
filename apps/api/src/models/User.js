@@ -14,6 +14,8 @@ const userSchema = new mongoose.Schema(
     timezone: { type: String, default: "UTC" },
     slackUserId: { type: String, default: null },
     standupTime: { type: String, default: "17:00" },
+    /** YYYY-MM-DD in user TZ: last time auto-draft job ran (idempotency) */
+    lastAutoDraftYmd: { type: String, default: null },
   },
   { timestamps: true }
 );

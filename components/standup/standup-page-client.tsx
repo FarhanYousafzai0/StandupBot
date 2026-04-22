@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, getErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { Standup, StandupTodayResponse } from "@/types/standup";
+import type { Standup, StandupResponse, StandupTodayResponse } from "@/types/standup";
 
 const area = cn(
   "w-full rounded-xl border border-border-cream bg-pure-white px-3 py-2 text-near-black shadow-[0_0_0_1px_#f0eee6] placeholder:text-stone-gray",
@@ -21,6 +21,7 @@ export function StandupPageClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [id, setId] = useState<string | null>(null);
 
@@ -71,6 +72,23 @@ export function StandupPageClient() {
       setError(getErrorMessage(e, "Could not generate standup (check OPENAI_API_KEY on the server)"));
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function onSendSlack() {
+    if (!id) {
+      setError("Generate a standup first.");
+      return;
+    }
+    setError(null);
+    setSending(true);
+    try {
+      const { data } = await api.post<StandupResponse>(`/api/standup/${id}/send`, {});
+      setStandup(data.standup);
+    } catch (e) {
+      setError(getErrorMessage(e, "Could not send to Slack (connect Slack in Settings)"));
+    } finally {
+      setSending(false);
     }
   }
 
@@ -134,6 +152,16 @@ export function StandupPageClient() {
             className="rounded-lg border border-border-warm bg-warm-sand px-4 py-2.5 text-sm font-medium text-charcoal-warm shadow-[0_0_0_1px_#d1cfc5] disabled:opacity-50"
           >
             {saving ? "Saving…" : "Save edits"}
+          </button>
+        ) : null}
+        {standup && id ? (
+          <button
+            type="button"
+            onClick={() => void onSendSlack()}
+            disabled={sending}
+            className="rounded-[10px] border border-border-cream bg-pure-white px-4 py-2.5 text-sm font-medium text-charcoal-warm shadow-[0_0_0_1px_#e8e6de] disabled:opacity-50"
+          >
+            {sending ? "Sending…" : "Send to Slack (DM)"}
           </button>
         ) : null}
       </div>

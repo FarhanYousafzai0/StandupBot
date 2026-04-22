@@ -10,6 +10,7 @@ import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import activityRoutes from "./routes/activity.routes.js";
 import standupRoutes from "./routes/standup.routes.js";
+import integrationRoutes from "./routes/integration.routes.js";
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/standup", standupRoutes);
+app.use("/api/integrations", integrationRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

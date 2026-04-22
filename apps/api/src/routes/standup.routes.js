@@ -6,7 +6,9 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/today", standupController.getToday);
+router.get("/history", standupController.listHistory);
 router.post("/generate", standupController.generate);
+router.post("/:id/send", standupController.send);
 router.put("/:id", standupController.update);
 
 export default router;

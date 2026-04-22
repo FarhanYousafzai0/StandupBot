@@ -39,3 +39,20 @@ export function getUtcRangeForUserDay(ymd, timeZone) {
   }
   return { start: start.toJSDate(), end: end.toJSDate() };
 }
+
+/**
+ * True when the user’s `standupTime` (e.g. "17:00") falls in the same 15-min wall-clock
+ * quarter as "now" in their timezone (used by the auto-draft job).
+ * @param {string} timeZone
+ * @param {string} standupTime
+ */
+export function isUserInCurrentStandupQuarter(timeZone, standupTime) {
+  const now = DateTime.now().setZone(timeZone);
+  const p = String(standupTime).match(/^(\d{1,2}):(\d{2})$/);
+  if (!p) {
+    return false;
+  }
+  const standM = parseInt(p[1], 10) * 60 + parseInt(p[2], 10);
+  const nowM = now.hour * 60 + now.minute;
+  return Math.floor(standM / 15) === Math.floor(nowM / 15);
+}

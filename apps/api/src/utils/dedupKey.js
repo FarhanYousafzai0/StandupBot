@@ -28,3 +28,13 @@ export function makeActivityDedupKey(
   const raw = [userId, source, key, day].join("\0");
   return crypto.createHash("sha256").update(raw).digest("hex");
 }
+
+/**
+ * One row per GitHub event (stable across days; used by the GitHub ingest job).
+ * @param {string} userId
+ * @param {string} githubEventId
+ */
+export function makeGitHubEventDedupKey(userId, githubEventId) {
+  const raw = [userId, "github", "event", String(githubEventId)].join("\0");
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}

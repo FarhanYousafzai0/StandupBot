@@ -224,7 +224,13 @@ standupbot/
 
 **Phase 5 done:** **OpenAI** (`openai` SDK) **`services/openai.service.js`**, `Standup` model, **GET** `/api/standup/today` (returns `date` + `standup` or `null`), **POST** `/api/standup/generate`, **PUT** `/api/standup/:id`. Env: **`OPENAI_API_KEY`**, **`OPENAI_MODEL`** (default `gpt-4o-mini`). **Standup** page: generate + edit + save.
 
-**Next: Phase 6** — GitHub integration + fetch job.
+**Phase 6 done:** `Integration` model (encrypted tokens); GitHub OAuth (`GET /api/integrations/github/authorize` → URL, `GET /api/integrations/github/callback`); `GET/DELETE /api/integrations` (`POST /api/integrations/github/sync`); `services/githubIngest` maps events → `Activity` with `makeGitHubEventDedupKey`; `jobs/fetchActivity` hourly `node-cron`. Env: `API_PUBLIC_URL`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`. **Settings** page: Connect / Sync / Disconnect.
+
+**Phase 7 done:** Slack OAuth v2 (bot) — `GET /api/integrations/slack/authorize`, `GET /api/integrations/slack/callback`; `services/slackMessage.service` (`@slack/web-api`) for DM and channels; **POST** `/api/standup/:id/send` (uses `editedContent` or section text, sets `status`/`sentAt`); **`jobs/generateStandup.job`** `*/15` with `isUserInCurrentStandupQuarter` + `User.lastAutoDraftYmd` + optional Slack “draft ready” DM. Env: **`SLACK_CLIENT_ID`**, **`SLACK_CLIENT_SECRET`**, scopes **`chat:write`**, **`im:write`**, **`users:read`**. **Settings** + **Standup** UI.
+
+**Phase 8 done:** Dashboard activity **grouped by source**; **Settings** `ProfileSettingsForm` + integration cards; **`PATCH /api/user/me`** (name, **IANA timezone**, `standupTime`); **`GET /api/standup/history?limit&before`** + **History** page with “Load older”. MVP workflow ready.
+
+**Next: Phase 9** — Tests.
 
 ---
 

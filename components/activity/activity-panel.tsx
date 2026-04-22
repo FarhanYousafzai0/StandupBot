@@ -1,9 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, getErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Activity, ActivityListResponse } from "@/types/activity";
+import {
+  ACTIVITY_SOURCE_ORDER,
+  getActivitySourceLabel,
+} from "@/lib/activity-source";
 
 const inputClass = cn(
   "w-full rounded-xl border border-border-cream bg-pure-white px-3 py-2 text-near-black shadow-[0_0_0_1px_#f0eee6] placeholder:text-stone-gray",
@@ -36,6 +40,41 @@ export function ActivityPanel() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const bySource = useMemo(() => {
+    if (!data?.activities) {
+      return new Map<string, Activity[]>();
+    }
+    const m = new Map<string, Activity[]>();
+    for (const a of data.activities) {
+      const k = a.source;
+      if (!m.has(k)) {
+        m.set(k, []);
+      }
+      m.get(k)!.push(a);
+    }
+    for (const arr of m.values()) {
+      arr.sort(
+        (x, y) => new Date(y.timestamp).getTime() - new Date(x.timestamp).getTime()
+      );
+    }
+    return m;
+  }, [data]);
+
+  const sourceKeys = useMemo(() => {
+    const keys = new Set(bySource.keys());
+    const out: string[] = [];
+    for (const s of ACTIVITY_SOURCE_ORDER) {
+      if (keys.has(s)) {
+        out.push(s);
+        keys.delete(s);
+      }
+    }
+    for (const s of keys) {
+      out.push(s);
+    }
+    return out;
+  }, [bySource]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -145,22 +184,31 @@ export function ActivityPanel() {
       </form>
 
       <div>
-        <h3 className="text-sm font-medium text-charcoal-warm">Feed</h3>
+        <h3 className="text-sm font-medium text-charcoal-warm">Feed (by source)</h3>
         {loading ? (
           <p className="mt-2 text-sm text-olive-gray">Loading…</p>
         ) : data && data.activities.length === 0 ? (
           <p className="mt-2 text-sm text-olive-gray">No activity yet. Add a line above.</p>
         ) : (
-          <ul className="mt-3 space-y-2">
-            {data?.activities.map((a) => (
-              <ActivityRow
-                key={a.id}
-                activity={a}
-                onDelete={onDelete}
-                busy={deleting === a.id}
-              />
+          <div className="mt-3 space-y-6">
+            {sourceKeys.map((source) => (
+              <div key={source}>
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-gray">
+                  {getActivitySourceLabel(source)}
+                </h4>
+                <ul className="mt-2 space-y-2">
+                  {bySource.get(source)?.map((a) => (
+                    <ActivityRow
+                      key={a.id}
+                      activity={a}
+                      onDelete={onDelete}
+                      busy={deleting === a.id}
+                    />
+                  ))}
+                </ul>
+              </div>
             ))}
-          </ul>
+          </div>
         )}
       </div>
     </section>
@@ -188,7 +236,7 @@ function ActivityRow({
           <p className="mt-0.5 text-olive-gray whitespace-pre-wrap">{a.description}</p>
         ) : null}
         <p className="mt-1 text-xs text-stone-gray">
-          {time}
+          {a.type} · {time}
           {a.isBlocker ? (
             <span className="ml-2 rounded bg-warm-sand px-1.5 py-0.5 text-error-crimson">
               Blocker

@@ -19,6 +19,14 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().optional().default(""),
   /** Model id, e.g. gpt-4o-mini, gpt-4o, gpt-4.1 */
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
+  /** Base URL of this API (OAuth callback, links). e.g. http://localhost:5000 in dev */
+  API_PUBLIC_URL: z.string().url().default("http://localhost:5000"),
+  /** GitHub OAuth (Phase 6). Optional — integrations disabled when empty */
+  GITHUB_CLIENT_ID: z.string().optional().default(""),
+  GITHUB_CLIENT_SECRET: z.string().optional().default(""),
+  /** Slack OAuth (bot — chat:write, im:write, users:read). Optional when empty */
+  SLACK_CLIENT_ID: z.string().optional().default(""),
+  SLACK_CLIENT_SECRET: z.string().optional().default(""),
 });
 
 const parsed = envSchema.safeParse(process.env);

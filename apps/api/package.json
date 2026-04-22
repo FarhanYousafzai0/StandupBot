@@ -12,6 +12,8 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@octokit/rest": "^22.0.1",
+    "@slack/web-api": "^7.15.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -21,6 +23,7 @@
     "luxon": "^3.7.2",
     "mongoose": "^8.7.0",
     "morgan": "^1.10.0",
+    "node-cron": "^4.2.1",
     "openai": "^6.34.0",
     "zod": "^3.23.8"
   }

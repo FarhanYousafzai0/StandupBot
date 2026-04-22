@@ -1,6 +1,8 @@
 import { connectDB, isDbConnected } from "./config/db.js";
 import { env } from "./config/env.js";
 import { app } from "./app.js";
+import { startFetchActivityJob } from "./jobs/fetchActivity.job.js";
+import { startGenerateStandupJob } from "./jobs/generateStandup.job.js";
 
 function logMongoError(err) {
   const message = err instanceof Error ? err.message : String(err);
@@ -46,6 +48,8 @@ function start() {
   app.listen(env.PORT, () => {
     console.log(`API listening on http://localhost:${env.PORT}`);
   });
+  startFetchActivityJob();
+  startGenerateStandupJob();
 }
 
 start();
