@@ -1,7 +1,7 @@
 # StandupBot — Implementation Plan
 
 Single source of truth for building the product **in order**, with clear acceptance criteria per phase.  
-**Stack (locked for v1):** Node 20+ · Express · MongoDB (Mongoose) · Next.js 14 (App Router) · Tailwind · shadcn/ui · Zustand · Axios · Anthropic (Claude) · JWT auth · `node-cron` (Bull/Redis **later** if needed)
+**Stack (locked for v1):** Node 20+ · Express · MongoDB (Mongoose) · Next.js 14 (App Router) · Tailwind · shadcn/ui · Zustand · Axios · **OpenAI (ChatGPT API)** for standup text · JWT auth · `node-cron` (Bull/Redis **later** if needed)
 
 ### Design system (UI consistency)
 
@@ -19,7 +19,7 @@ Single source of truth for building the product **in order**, with clear accepta
 | Scope | MVP: **GitHub + Slack + web**; **no** Jira, **no** VS Code extension, **no** Bull until needed |
 | “Day” rule | Document: standup/activity “today” = **user’s local calendar day**; store UTC range in DB; one sentence in this doc (§1) |
 | Dev URLs | e.g. API `http://localhost:5000`, Web `http://localhost:3000` — all OAuth redirect URIs and `NEXT_PUBLIC_API_URL` must match |
-| Accounts | MongoDB (local/Atlas) · Anthropic key · GitHub OAuth app · Slack app (redirect URLs) |
+| Accounts | MongoDB (local/Atlas) · **OpenAI API key** · GitHub OAuth app · Slack app (redirect URLs) |
 | UI | Read **DESIGN.md**; plan Tailwind token mapping in Phase 3 |
 
 **Day rule (v1):** For each user, `date` = `YYYY-MM-DD` in `user.timezone`. Query activities with `timestamp` in `[localStartUtc, localEndUtc)` for that calendar day.
@@ -33,7 +33,7 @@ Single source of truth for building the product **in order**, with clear accepta
                                       |
                     +-----------------+-----------------+
                     v                 v                 v
-              [ GitHub API ]   [ Slack API ]     [ Anthropic API ]
+              [ GitHub API ]   [ Slack API ]     [ OpenAI API ]
 ```
 
 - **Cron** runs in the **same Node process** as the API (or a second entry file that `import`s the same `services/*`).  
@@ -64,7 +64,7 @@ standupbot/
 │   │   │   ├── models/          # User, Activity, Standup, Integration
 │   │   │   ├── routes/
 │   │   │   ├── controllers/
-│   │   │   ├── services/        # github, slack, claude, aggregator
+│   │   │   ├── services/        # github, slack, openai, aggregator
 │   │   │   ├── jobs/            # fetchActivity, generateStandup
 │   │   │   ├── middleware/      # auth, error, asyncHandler
 │   │   │   └── app.js
@@ -140,15 +140,15 @@ standupbot/
 
 ---
 
-### Phase 5 — Standup + Claude (no GitHub yet)
+### Phase 5 — Standup + OpenAI (ChatGPT) (no GitHub yet)
 
 | Step | Task | Done when |
 |------|------|-----------|
-| 5.1 | `services/claude.service.js` — system+user prompt from spec | Returns yesterday/today/blockers (markdown or small JSON) |
-| 5.2 | `Standup` model: userId, date, sections, `editedContent`, `status` | |
-| 5.3 | `POST /api/standup/generate` — aggregate today’s activities → Claude → upsert **draft** | |
-| 5.4 | `GET /api/standup/today`, `PUT /api/standup/:id` | User can edit `editedContent` |
-| 5.5 | Web: **Standup** page — load draft, edit, save | |
+| 5.1 | `services/openai.service.js` — system+user prompt; JSON `yesterday` / `today` / `blockers` | OpenAI `chat.completions` + `response_format: json_object` |
+| 5.2 | `Standup` model: userId, date, `rawActivityIds`, sections, `editedContent`, `status` | |
+| 5.3 | `POST /api/standup/generate` — today’s activities → OpenAI → upsert **draft** | `OPENAI_API_KEY` in `apps/api/.env` |
+| 5.4 | `GET /api/standup/today`, `PUT /api/standup/:id` | User can edit section text |
+| 5.5 | Web: **Standup** page — load, generate, edit, save | |
 
 **Exit:** With **manual** activities, generate a standup, edit, persist.
 
@@ -195,7 +195,7 @@ standupbot/
 
 | Step | Task | Done when |
 |------|------|-----------|
-| 9.1 | **Unit** (Jest/Node test): date boundaries, dedup, claude parse | CI-ready |
+| 9.1 | **Unit** (Jest/Node test): date boundaries, dedup, standup JSON parse | CI-ready |
 | 9.2 | **API integration** (supertest + in-memory Mongo or test DB): auth, activity, standup | |
 | 9.3 | **Playwright** (E2E): register/login → dashboard; optional happy path generate standup (use test env / seeded user) | `playwright.config` starts or assumes URLs |
 
@@ -222,7 +222,9 @@ standupbot/
 
 **Phase 4 done:** `Activity` model + **unique** `(userId, dedupKey)`; **Luxon**-style day range in user **timezone**; **GET** `/api/activity/today`, **GET** `/api/activity?date=YYYY-MM-DD`, **POST** `/api/activity`, **DELETE** `/api/activity/:id` (auth). Dashboard **ActivityPanel** (manual log + list + delete).
 
-**Next: Phase 5** — standup + Claude.
+**Phase 5 done:** **OpenAI** (`openai` SDK) **`services/openai.service.js`**, `Standup` model, **GET** `/api/standup/today` (returns `date` + `standup` or `null`), **POST** `/api/standup/generate`, **PUT** `/api/standup/:id`. Env: **`OPENAI_API_KEY`**, **`OPENAI_MODEL`** (default `gpt-4o-mini`). **Standup** page: generate + edit + save.
+
+**Next: Phase 6** — GitHub integration + fetch job.
 
 ---
 

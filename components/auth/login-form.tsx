@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, getErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { isApiConfigured } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import type { AuthResponse } from "@/types/user";
 
@@ -28,10 +27,6 @@ export function LoginForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!isApiConfigured()) {
-      setError("Set NEXT_PUBLIC_API_URL in .env.local (see .env.local.example).");
-      return;
-    }
     setLoading(true);
     try {
       const { data } = await api.post<AuthResponse>(

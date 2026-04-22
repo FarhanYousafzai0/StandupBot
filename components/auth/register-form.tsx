@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, getErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { isApiConfigured } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import type { AuthResponse } from "@/types/user";
 
@@ -26,10 +25,6 @@ export function RegisterForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!isApiConfigured()) {
-      setError("Set NEXT_PUBLIC_API_URL in .env.local (see .env.local.example).");
-      return;
-    }
     if (password.length < 8) {
       setError("Password must be at least 8 characters.");
       return;

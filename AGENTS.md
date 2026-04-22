@@ -9,8 +9,9 @@ Developer productivity app: **daily standup drafts** from tracked activity (GitH
 ## Stack (this repo)
 
 - **Frontend:** Next.js (App Router) at **repo root** — `app/`, `components/`, `lib/`
-- **Backend:** Express API in **`apps/api/`** (npm workspace `api`). Set **`NEXT_PUBLIC_API_URL`** in **`.env.local`** (e.g. `http://localhost:5000`). API env: **`apps/api/.env`** from **`.env.example`**
-- **DB / jobs:** MongoDB + Mongoose; `node-cron` added when jobs land (per plan)
+- **Backend:** Express API in **`apps/api/`** (npm workspace `api`). In **dev**, **`NEXT_PUBLIC_API_URL=http://localhost:3000`** (or empty) so `/api` is **proxied** to Express on 5000 via **`next.config.ts`**. Set **`MONGODB_URI`** and optionally **`MONGODB_URI_DIRECT`** (non-SRV, used when set) in **`apps/api/.env`**
+- **DB / jobs:** MongoDB + Mongoose; **standup text** via **OpenAI** Chat Completions; `node-cron` when jobs land (per plan)
+- **API secrets:** `apps/api/.env` — add **`OPENAI_API_KEY`** (and optional **`OPENAI_MODEL`**, default `gpt-4o-mini`) for `/api/standup/generate`
 
 ## Must-read files
 

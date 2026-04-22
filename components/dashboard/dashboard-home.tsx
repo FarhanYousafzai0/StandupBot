@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, getErrorMessage } from "@/lib/api";
 import { useAuthStore } from "@/lib/auth-store";
-import { isApiConfigured } from "@/lib/env";
 import type { PublicUser } from "@/types/user";
 import { ActivityPanel } from "@/components/activity/activity-panel";
 
@@ -34,11 +33,6 @@ export function DashboardHome() {
   const [loading, setLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    if (!isApiConfigured()) {
-      setLoadError("Set NEXT_PUBLIC_API_URL in .env.local.");
-      setLoading(false);
-      return;
-    }
     if (!token) {
       setLoading(false);
       return;

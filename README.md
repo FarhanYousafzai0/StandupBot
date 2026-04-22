@@ -20,15 +20,20 @@ This monorepo uses **pnpm** (`pnpm-workspace.yaml`). Install from the repo root:
 pnpm install
 ```
 
-**Web (Next.js)**
+**Web + API (recommended for local dev)**
+
+From the repo root, one terminal:
 
 ```bash
-pnpm run dev
+pnpm install
+pnpm run dev:all
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+This starts **Next** on [http://localhost:3000](http://localhost:3000) and the **Express API** on port **5000** (so the `/api` proxy works). You still need **`apps/api/.env`** (copy from `apps/api/.env.example`) with `MONGODB_URI`, `JWT_SECRET`, and MongoDB running or Atlas reachable.
 
-**API (Express)**
+**Or run them separately:** `pnpm run dev` in one terminal and `pnpm run dev:api` in another.
+
+**API only**
 
 1. Copy **`apps/api/.env.example`** → **`apps/api/.env`**, set `MONGODB_URI` and `JWT_SECRET` (8+ characters).
 2. Start MongoDB locally (or use Atlas) so `MONGODB_URI` is reachable.
@@ -42,10 +47,17 @@ pnpm run dev:api
 - Auth: `POST /api/auth/register`, `POST /api/auth/login` — response includes `token` (JWT, 7d).
 - Me: `GET /api/user/me` with header `Authorization: Bearer <token>`.
 - Activity (auth): `GET /api/activity/today` · `GET /api/activity?date=YYYY-MM-DD` · `POST /api/activity` · `DELETE /api/activity/:id` — “today” is the user’s **timezone** from their profile; dedupe by **source + URL + day** (manual entries use **title** when URL is empty).
+- Standup (auth): `GET /api/standup/today` · `POST /api/standup/generate` · `PUT /api/standup/:id` — drafts use **OpenAI** (`OPENAI_API_KEY` + optional `OPENAI_MODEL` in **`apps/api/.env`**).
 
 **Frontend env**
 
-Copy **`.env.local.example`** → **`.env.local`** and set **`NEXT_PUBLIC_API_URL=http://localhost:5000`** (no trailing slash) with the API running. Then **register** or **log in** at `/register` and `/login`; the **dashboard** calls **`/api/user/me`** with the stored JWT.
+Copy **`.env.local.example`** → **`.env.local`**. In local dev, set **`NEXT_PUBLIC_API_URL=http://localhost:3000`** (same as the Next app) or leave it empty for same-origin requests. The dev server **proxies** **`/api/*`** to Express on **5000** (override with **`API_PROXY_TARGET`** if needed). That way the **browser** only uses port **3000** and you avoid `ERR_CONNECTION_REFUSED` to **5000** when the app was misconfigured. Run **`pnpm run dev:api`** so Express listens (default **`PORT=5000`** in **`apps/api/.env`**). You can also set **`NEXT_PUBLIC_API_URL=http://localhost:5000`** to call the API port directly, without the proxy. Then **register** or **log in**; the **dashboard** uses **`/api/user/me`**.
+
+**Sign-in tip:** `email` is stored **lowercased**; the API now **normalizes** login/register the same way.
+
+### MongoDB / Atlas
+
+Set **`MONGODB_URI`** in **`apps/api/.env`**. If **`querySrv` / SRV** fails on your network, paste Atlas’s **standard** (non-srv) string into **`MONGODB_URI_DIRECT`** — the API will use that and skip SRV. If the first DB connection fails, the server still starts and **retries every 10s**; `/api` may return **503** until the DB is reachable.
 
 ## Design & agent context
 
@@ -62,6 +74,7 @@ Copy **`.env.local.example`** → **`.env.local`** and set **`NEXT_PUBLIC_API_UR
 |---------|-------------|
 | `pnpm run dev` | Next.js dev server |
 | `pnpm run dev:api` | Express API (workspace `api`; port from `PORT`, default 5000) |
+| `pnpm run dev:all` | Next + Express together (use this so port 5000 is up for `/api` proxy) |
 | `pnpm run build` | Production build (Next) |
 | `pnpm run lint` | ESLint |
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { StandupPageClient } from "@/components/standup/standup-page-client";
 
 export default function StandupPage() {
   return (
@@ -6,12 +6,11 @@ export default function StandupPage() {
       <header>
         <h1 className="font-display text-3xl text-near-black">Standup</h1>
         <p className="mt-2 text-olive-gray">
-          Review and edit your draft, then send to Slack (Phase 5+).
+          Generate a draft with <strong>OpenAI</strong> from today&apos;s activity, edit, then save. Slack
+          in Phase 7.
         </p>
       </header>
-      <Link href="/dashboard" className="text-sm text-stone-gray hover:text-olive-gray">
-        ← Dashboard
-      </Link>
+      <StandupPageClient />
     </div>
   );
 }

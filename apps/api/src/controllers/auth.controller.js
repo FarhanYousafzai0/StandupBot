@@ -9,7 +9,11 @@ import { asyncHandler } from "../middleware/asyncHandler.js";
 const registerSchema = z.object({
   email: z.string().email("Invalid email"),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  name: z.string().trim().max(120).optional().default(""),
+  name: z
+    .union([z.string(), z.null(), z.undefined()])
+    .transform((v) =>
+      v == null || v === "" ? "" : String(v).trim().slice(0, 120)
+    ),
   timezone: z.string().min(1).max(64).optional().default("UTC"),
   standupTime: z
     .string()
@@ -35,7 +39,8 @@ export const register = asyncHandler(async (req, res) => {
     const first = parsed.error.issues[0];
     throw new AppError(422, "VALIDATION_ERROR", first?.message || "Invalid body");
   }
-  const { email, password, name, timezone, standupTime } = parsed.data;
+  const { email: rawEmail, password, name, timezone, standupTime } = parsed.data;
+  const email = rawEmail.toLowerCase().trim();
 
   const existing = await User.findOne({ email });
   if (existing) {
@@ -43,13 +48,21 @@ export const register = asyncHandler(async (req, res) => {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const user = await User.create({
-    email,
-    passwordHash,
-    name,
-    timezone,
-    standupTime,
-  });
+  let user;
+  try {
+    user = await User.create({
+      email,
+      passwordHash,
+      name,
+      timezone,
+      standupTime,
+    });
+  } catch (e) {
+    if (e && (e.code === 11000 || e.code === "11000")) {
+      throw new AppError(409, "EMAIL_IN_USE", "An account with this email already exists");
+    }
+    throw e;
+  }
 
   const token = signToken(user._id);
   res.status(201).json({
@@ -64,7 +77,8 @@ export const login = asyncHandler(async (req, res) => {
     const first = parsed.error.issues[0];
     throw new AppError(422, "VALIDATION_ERROR", first?.message || "Invalid body");
   }
-  const { email, password } = parsed.data;
+  const { email: rawEmail, password } = parsed.data;
+  const email = rawEmail.toLowerCase().trim();
 
   const user = await User.findOne({ email }).select("+passwordHash");
   if (!user) {

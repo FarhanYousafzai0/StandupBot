@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:api": "pnpm --filter api dev",
+    "dev:all": "concurrently -k -n next,api -c cyan,magenta \"next dev\" \"pnpm --filter api dev\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -19,6 +20,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "concurrently": "^9.1.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

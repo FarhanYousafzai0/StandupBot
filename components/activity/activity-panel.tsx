@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api, getErrorMessage } from "@/lib/api";
-import { isApiConfigured } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import type { Activity, ActivityListResponse } from "@/types/activity";
 
@@ -22,10 +21,6 @@ export function ActivityPanel() {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!isApiConfigured()) {
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
       const { data: res } = await api.get<ActivityListResponse>("/api/activity/today");
@@ -81,14 +76,6 @@ export function ActivityPanel() {
     } finally {
       setDeleting(null);
     }
-  }
-
-  if (!isApiConfigured()) {
-    return (
-      <p className="text-sm text-olive-gray">
-        Set <code className="font-mono text-sm">NEXT_PUBLIC_API_URL</code> to use activities.
-      </p>
-    );
   }
 
   return (

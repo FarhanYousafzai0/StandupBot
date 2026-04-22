@@ -15,6 +15,7 @@ Read **`IMPLEMENTATION_PLAN.md`** at the repo root. Follow phases **in order** (
 - Auth: `Authorization: Bearer <token>` for protected routes; handle **401** globally in the client (clear session, redirect to login).
 - errors: expect `{ error: { code, message } }` and correct HTTP status — do not expect `200` with an error in the body.
 - “Today” for standups/activities: user **timezone** and **local calendar day** as defined in the plan; store/query in **UTC** with explicit boundaries.
+- Standup **AI** uses **OpenAI** (`apps/api` `OPENAI_API_KEY`, not Anthropic) unless the plan explicitly changes provider.
 
 ## Scope discipline
 
