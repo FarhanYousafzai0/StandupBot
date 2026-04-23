@@ -1,63 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, getErrorMessage } from "@/lib/api";
+import { useRequireAuth } from "@/lib/auth-hooks";
 import { useAuthStore } from "@/lib/auth-store";
 import type { PublicUser } from "@/types/user";
 import { ActivityPanel } from "@/components/activity/activity-panel";
 
-function useHasHydrated() {
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    if (useAuthStore.persist.hasHydrated()) {
-      setHydrated(true);
-      return;
-    }
-    return useAuthStore.persist.onFinishHydration(() => {
-      setHydrated(true);
-    });
-  }, []);
-  return hydrated;
-}
-
 export function DashboardHome() {
   const router = useRouter();
-  const hydrated = useHasHydrated();
-  const token = useAuthStore((s) => s.token);
-  const user = useAuthStore((s) => s.user);
+  const queryClient = useQueryClient();
+  const { hydrated, token } = useRequireAuth("/dashboard");
+  const storedUser = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
   const clearAuth = useAuthStore((s) => s.clearAuth);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const refreshUser = useCallback(async () => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-    try {
+  const userQuery = useQuery({
+    queryKey: ["me"],
+    enabled: hydrated && !!token,
+    queryFn: async () => {
       const { data } = await api.get<{ user: PublicUser }>("/api/user/me");
       setUser(data.user);
-      setLoadError(null);
-    } catch (e) {
-      setLoadError(getErrorMessage(e, "Could not load profile"));
-    } finally {
-      setLoading(false);
-    }
-  }, [setUser, token]);
-
-  useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
-    if (!token) {
-      router.replace("/login?from=/dashboard");
-      return;
-    }
-    void refreshUser();
-  }, [hydrated, token, router, refreshUser]);
+      return data.user;
+    },
+  });
 
   if (!hydrated) {
     return (
@@ -75,7 +42,7 @@ export function DashboardHome() {
     );
   }
 
-  if (loading) {
+  if (userQuery.isPending) {
     return (
       <p className="text-olive-gray" aria-live="polite">
         Loading your profile…
@@ -83,7 +50,11 @@ export function DashboardHome() {
     );
   }
 
+  const user = userQuery.data ?? storedUser;
   const displayName = user?.name?.trim() || user?.email || "there";
+  const loadError = userQuery.error
+    ? getErrorMessage(userQuery.error, "Could not load profile")
+    : null;
 
   return (
     <div className="flex flex-col gap-8">
@@ -106,6 +77,7 @@ export function DashboardHome() {
           type="button"
           onClick={() => {
             clearAuth();
+            queryClient.clear();
             router.push("/login");
             router.refresh();
           }}

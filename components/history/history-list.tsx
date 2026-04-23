@@ -1,85 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { api, getErrorMessage } from "@/lib/api";
-import { useAuthStore } from "@/lib/auth-store";
+import { useRequireAuth } from "@/lib/auth-hooks";
 import type { Standup, StandupHistoryResponse } from "@/types/standup";
 
 const PAGE = 20;
 
-function useHasHydrated() {
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    if (useAuthStore.persist.hasHydrated()) {
-      setHydrated(true);
-      return;
-    }
-    return useAuthStore.persist.onFinishHydration(() => {
-      setHydrated(true);
-    });
-  }, []);
-  return hydrated;
-}
-
 export function HistoryList() {
-  const router = useRouter();
-  const hydrated = useHasHydrated();
-  const token = useAuthStore((s) => s.token);
-  const [items, setItems] = useState<Standup[]>([]);
-  const [nextBefore, setNextBefore] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(
-    async (append: boolean, before: string | null) => {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
+  const { hydrated, token } = useRequireAuth("/history");
+  const historyQuery = useInfiniteQuery({
+    queryKey: ["standups", "history"],
+    enabled: hydrated && !!token,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      const q = new URLSearchParams();
+      q.set("limit", String(PAGE));
+      if (pageParam) {
+        q.set("before", pageParam);
       }
-      setError(null);
-      try {
-        const q = new URLSearchParams();
-        q.set("limit", String(PAGE));
-        if (before) {
-          q.set("before", before);
-        }
-        const { data } = await api.get<StandupHistoryResponse>(
-          `/api/standup/history?${q.toString()}`
-        );
-        if (append) {
-          setItems((prev) => [...prev, ...data.standups]);
-        } else {
-          setItems(data.standups);
-        }
-        setNextBefore(data.nextBeforeDate);
-      } catch (e) {
-        setError(getErrorMessage(e, "Could not load history"));
-        if (!append) {
-          setItems([]);
-        }
-        setNextBefore(null);
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
+      const { data } = await api.get<StandupHistoryResponse>(
+        `/api/standup/history?${q.toString()}`
+      );
+      return data;
     },
-    []
-  );
-
-  useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
-    if (!token) {
-      router.replace("/login?from=/history");
-      return;
-    }
-    void load(false, null);
-  }, [hydrated, token, router, load]);
+    getNextPageParam: (lastPage) => lastPage.nextBeforeDate,
+  });
 
   if (!hydrated) {
     return <p className="text-sm text-olive-gray">Loading…</p>;
@@ -89,9 +36,17 @@ export function HistoryList() {
     return <p className="text-sm text-olive-gray">Redirecting…</p>;
   }
 
-  if (loading) {
+  if (historyQuery.isPending) {
     return <p className="text-olive-gray">Loading standups…</p>;
   }
+
+  const items = historyQuery.data?.pages.flatMap((page) => page.standups) ?? [];
+  const nextBefore = historyQuery.hasNextPage
+    ? historyQuery.data?.pages[historyQuery.data.pages.length - 1]?.nextBeforeDate ?? null
+    : null;
+  const error = historyQuery.error
+    ? getErrorMessage(historyQuery.error, "Could not load history")
+    : null;
 
   return (
     <div className="space-y-6">
@@ -139,11 +94,11 @@ export function HistoryList() {
       {nextBefore ? (
         <button
           type="button"
-          onClick={() => void load(true, nextBefore)}
-          disabled={loadingMore}
+          onClick={() => void historyQuery.fetchNextPage()}
+          disabled={historyQuery.isFetchingNextPage}
           className="rounded-lg border border-border-warm bg-warm-sand px-4 py-2.5 text-sm font-medium text-charcoal-warm shadow-[0_0_0_1px_#d1cfc5] disabled:opacity-50"
         >
-          {loadingMore ? "Loading…" : "Load older"}
+          {historyQuery.isFetchingNextPage ? "Loading…" : "Load older"}
         </button>
       ) : null}
     </div>

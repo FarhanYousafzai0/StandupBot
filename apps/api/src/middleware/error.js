@@ -1,15 +1,17 @@
 import { env } from "../config/env.js";
+import { logger } from "../config/logger.js";
 import { AppError } from "../utils/AppError.js";
 
 const isProd = () => env.NODE_ENV === "production";
 
-// eslint-disable-next-line no-unused-vars
-export function errorHandler(err, req, res, next) {
+export function errorHandler(err, req, res, _next) {
   const prod = isProd();
+  void _next;
+  const log = req.log || logger;
 
   if (err instanceof AppError) {
     if (err.status >= 500) {
-      console.error(err);
+      log.error({ err }, "Application error");
     }
     const message =
       prod && err.status >= 500
@@ -47,7 +49,7 @@ export function errorHandler(err, req, res, next) {
     });
   }
 
-  console.error(err);
+  log.error({ err }, "Unhandled error");
   return res.status(500).json({
     error: {
       code: "INTERNAL_ERROR",
@@ -58,7 +60,6 @@ export function errorHandler(err, req, res, next) {
   });
 }
 
-// eslint-disable-next-line no-unused-vars
 export function notFoundHandler(req, res, next) {
   next(new AppError(404, "NOT_FOUND", "Not found"));
 }

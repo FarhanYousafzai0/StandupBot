@@ -5,6 +5,10 @@ import { env } from "../config/env.js";
 import { AppError } from "../utils/AppError.js";
 import { User, toPublicUser } from "../models/User.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
+import {
+  isValidTimezone,
+  normalizeStandupTime,
+} from "../utils/validation.js";
 
 const registerSchema = z.object({
   email: z.string().email("Invalid email"),
@@ -17,7 +21,10 @@ const registerSchema = z.object({
   timezone: z.string().min(1).max(64).optional().default("UTC"),
   standupTime: z
     .string()
-    .regex(/^\d{1,2}:\d{2}$/, "standupTime must be HH:MM (e.g. 17:00)")
+    .regex(
+      /^([01]?\d|2[0-3]):[0-5]\d$/,
+      "standupTime must be HH:mm (e.g. 17:00)"
+    )
     .optional()
     .default("17:00"),
 });
@@ -40,6 +47,21 @@ export const register = asyncHandler(async (req, res) => {
     throw new AppError(422, "VALIDATION_ERROR", first?.message || "Invalid body");
   }
   const { email: rawEmail, password, name, timezone, standupTime } = parsed.data;
+  if (!isValidTimezone(timezone)) {
+    throw new AppError(
+      422,
+      "VALIDATION_ERROR",
+      "Invalid IANA timezone (e.g. Europe/London, America/New_York)"
+    );
+  }
+  const normalizedStandupTime = normalizeStandupTime(standupTime);
+  if (!normalizedStandupTime) {
+    throw new AppError(
+      422,
+      "VALIDATION_ERROR",
+      "standupTime must be HH:mm (e.g. 17:00)"
+    );
+  }
   const email = rawEmail.toLowerCase().trim();
 
   const existing = await User.findOne({ email });
@@ -55,7 +77,7 @@ export const register = asyncHandler(async (req, res) => {
       passwordHash,
       name,
       timezone,
-      standupTime,
+      standupTime: normalizedStandupTime,
     });
   } catch (e) {
     if (e && (e.code === 11000 || e.code === "11000")) {

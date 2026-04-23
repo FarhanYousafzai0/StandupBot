@@ -54,6 +54,7 @@ export async function generateOrUpsertStandupForUser(userId, dateYmd) {
   const payload = mapActivitiesForOpenAI(items);
   const ai = await generateStandupSections(payload);
   const ids = items.map((a) => a._id);
+  const existing = await Standup.findOne({ userId, date: ymd });
 
   const setDoc = {
     userId,
@@ -62,8 +63,10 @@ export async function generateOrUpsertStandupForUser(userId, dateYmd) {
     yesterday: ai.yesterday,
     today: ai.today,
     blockers: ai.blockers,
-    editedContent: "",
-    status: "draft",
+    editedContent: existing?.editedContent ?? "",
+    status: existing?.status ?? "draft",
+    sentAt: existing?.sentAt ?? null,
+    sentTo: existing?.sentTo ?? [],
   };
 
   const doc = await Standup.findOneAndUpdate(

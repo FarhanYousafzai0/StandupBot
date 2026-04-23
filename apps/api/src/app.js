@@ -1,9 +1,9 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import morgan from "morgan";
 import { env } from "./config/env.js";
 import { isDbReadyForApi } from "./config/db.js";
+import { requestLogger } from "./config/logger.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.js";
 import healthRoutes from "./routes/health.routes.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -21,7 +21,7 @@ app.use(
     credentials: true,
   })
 );
-app.use(morgan("dev"));
+app.use(requestLogger);
 app.use(express.json());
 
 app.use("/api", (req, res, next) => {

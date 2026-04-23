@@ -91,44 +91,46 @@ export async function ingestGithubEventsForUser(integration) {
   const uid = userId.toString();
   const token = decryptString(integration.encryptedAccessToken);
   const octokit = new Octokit({ auth: token });
-  const { data: events } = await octokit.rest.activity.listEventsForAuthenticatedUser({
-    per_page: 30,
-  });
   const user = await User.findById(userId);
   if (!user) {
     return { created: 0 };
   }
 
   let created = 0;
-  for (const event of events) {
-    const mapped = mapGithubEvent(/** @type {Record<string, unknown>} */ (event));
-    if (!mapped) {
-      continue;
-    }
-    const dedupKey = makeGitHubEventDedupKey(uid, String(event.id));
-    try {
-      await Activity.create({
-        userId,
-        source: "github",
-        type: mapped.type,
-        title: mapped.title,
-        description: mapped.description,
-        url: mapped.url,
-        metadata: {
-          githubEventId: event.id,
-          githubType: event.type,
-          ...mapped.metadata,
-        },
-        timestamp: new Date(event.created_at),
-        isBlocker: false,
-        dedupKey,
-      });
-      created += 1;
-    } catch (e) {
-      if (e && (e.code === 11000 || e.code === "11000")) {
+  for await (const page of octokit.paginate.iterator(
+    octokit.rest.activity.listEventsForAuthenticatedUser,
+    { per_page: 100 }
+  )) {
+    for (const event of page.data) {
+      const mapped = mapGithubEvent(/** @type {Record<string, unknown>} */ (event));
+      if (!mapped) {
         continue;
       }
-      throw e;
+      const dedupKey = makeGitHubEventDedupKey(uid, String(event.id));
+      try {
+        await Activity.create({
+          userId,
+          source: "github",
+          type: mapped.type,
+          title: mapped.title,
+          description: mapped.description,
+          url: mapped.url,
+          metadata: {
+            githubEventId: event.id,
+            githubType: event.type,
+            ...mapped.metadata,
+          },
+          timestamp: new Date(event.created_at),
+          isBlocker: false,
+          dedupKey,
+        });
+        created += 1;
+      } catch (e) {
+        if (e && (e.code === 11000 || e.code === "11000")) {
+          continue;
+        }
+        throw e;
+      }
     }
   }
   return { created };

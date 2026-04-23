@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, getErrorMessage } from "@/lib/api";
+import { useRequireAuth } from "@/lib/auth-hooks";
 import { useAuthStore } from "@/lib/auth-store";
 import { cn } from "@/lib/utils";
 import type { PublicUser } from "@/types/user";
@@ -12,60 +14,80 @@ const field = cn(
 );
 
 export function ProfileSettingsForm() {
+  const queryClient = useQueryClient();
+  const { hydrated, token } = useRequireAuth("/settings");
   const setUser = useAuthStore((s) => s.setUser);
-  const [name, setName] = useState("");
-  const [timezone, setTimezone] = useState("UTC");
-  const [standupTime, setStandupTime] = useState("17:00");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [draft, setDraft] = useState<{
+    name: string;
+    timezone: string;
+    standupTime: string;
+  } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const profileQuery = useQuery({
+    queryKey: ["me"],
+    enabled: hydrated && !!token,
+    queryFn: async () => {
       const { data } = await api.get<{ user: PublicUser }>("/api/user/me");
-      const u = data.user;
-      setName(u.name || "");
-      setTimezone(u.timezone || "UTC");
-      setStandupTime(u.standupTime || "17:00");
-    } catch (e) {
-      setError(getErrorMessage(e, "Could not load profile"));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+      return data.user;
+    },
+  });
+  const saveMutation = useMutation({
+    mutationFn: async (values: { name: string; timezone: string; standupTime: string }) => {
+      const { data } = await api.patch<{ user: PublicUser }>("/api/user/me", {
+        name: values.name.trim() || undefined,
+        timezone: values.timezone.trim(),
+        standupTime: values.standupTime,
+      });
+      return data.user;
+    },
+    onSuccess: async (user) => {
+      setUser(user);
+      setDraft({
+        name: user.name || "",
+        timezone: user.timezone || "UTC",
+        standupTime: user.standupTime || "17:00",
+      });
+      setMessage("Saved.");
+      await queryClient.setQueryData(["me"], user);
+    },
+    onError: () => {
+      setMessage(null);
+    },
+  });
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setMessage(null);
-    setSaving(true);
-    try {
-      const { data } = await api.patch<{ user: PublicUser }>("/api/user/me", {
-        name: name.trim() || undefined,
-        timezone: timezone.trim(),
-        standupTime,
-      });
-      setUser(data.user);
-      setName(data.user.name);
-      setTimezone(data.user.timezone);
-      setStandupTime(data.user.standupTime);
-      setMessage("Saved.");
-    } catch (err) {
-      setError(getErrorMessage(err, "Could not save"));
-    } finally {
-      setSaving(false);
+    if (!values) {
+      return;
     }
+    await saveMutation.mutateAsync(values);
   }
 
-  if (loading) {
+  if (!hydrated) {
     return <p className="text-sm text-olive-gray">Loading profile…</p>;
+  }
+  if (!token) {
+    return <p className="text-sm text-olive-gray">Redirecting…</p>;
+  }
+  if (profileQuery.isPending) {
+    return <p className="text-sm text-olive-gray">Loading profile…</p>;
+  }
+
+  const values = draft ?? (profileQuery.data
+    ? {
+        name: profileQuery.data.name || "",
+        timezone: profileQuery.data.timezone || "UTC",
+        standupTime: profileQuery.data.standupTime || "17:00",
+      }
+    : null);
+  const error = saveMutation.error || profileQuery.error;
+
+  function updateDraft(patch: Partial<NonNullable<typeof values>>) {
+    if (!values) {
+      return;
+    }
+    setDraft({ ...values, ...patch });
   }
 
   return (
@@ -84,7 +106,7 @@ export function ProfileSettingsForm() {
       ) : null}
       {error ? (
         <p className="text-sm text-error-crimson" role="alert">
-          {error}
+          {getErrorMessage(error, "Could not save")}
         </p>
       ) : null}
       <form onSubmit={onSubmit} className="space-y-4">
@@ -95,8 +117,8 @@ export function ProfileSettingsForm() {
           <input
             id="profile-name"
             className={cn("mt-1", field)}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={values?.name ?? ""}
+            onChange={(e) => updateDraft({ name: e.target.value })}
             maxLength={200}
             placeholder="How we greet you on the dashboard"
             autoComplete="name"
@@ -109,8 +131,8 @@ export function ProfileSettingsForm() {
           <input
             id="tz"
             className={cn("mt-1", field)}
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
+            value={values?.timezone ?? "UTC"}
+            onChange={(e) => updateDraft({ timezone: e.target.value })}
             placeholder="e.g. America/Los_Angeles, Europe/Paris, UTC"
             spellCheck={false}
             required
@@ -124,17 +146,17 @@ export function ProfileSettingsForm() {
             id="st"
             type="time"
             className={cn("mt-1 w-full max-w-[10rem]", field)}
-            value={toTimeInput(standupTime)}
-            onChange={(e) => setStandupTime(fromTimeInput(e.target.value))}
+            value={toTimeInput(values?.standupTime ?? "17:00")}
+            onChange={(e) => updateDraft({ standupTime: fromTimeInput(e.target.value) })}
             required
           />
         </div>
         <button
           type="submit"
-          disabled={saving}
+          disabled={saveMutation.isPending}
           className="rounded-[10px] bg-terracotta px-4 py-2.5 text-sm font-medium text-ivory shadow-[0_0_0_1px_#c96442] disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Save profile"}
+          {saveMutation.isPending ? "Saving…" : "Save profile"}
         </button>
       </form>
     </section>

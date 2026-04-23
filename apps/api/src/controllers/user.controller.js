@@ -1,8 +1,11 @@
 import { z } from "zod";
-import { DateTime } from "luxon";
 import { AppError } from "../utils/AppError.js";
 import { asyncHandler } from "../middleware/asyncHandler.js";
 import { User, toPublicUser } from "../models/User.js";
+import {
+  isValidTimezone,
+  normalizeStandupTime,
+} from "../utils/validation.js";
 
 const patchSchema = z.object({
   name: z.string().max(200).optional(),
@@ -32,7 +35,7 @@ export const patchMe = asyncHandler(async (req, res) => {
     throw new AppError(422, "VALIDATION_ERROR", "No valid fields to update");
   }
   if (b.timezone) {
-    if (!DateTime.now().setZone(b.timezone).isValid) {
+    if (!isValidTimezone(b.timezone)) {
       throw new AppError(
         422,
         "VALIDATION_ERROR",
@@ -51,8 +54,15 @@ export const patchMe = asyncHandler(async (req, res) => {
     user.timezone = b.timezone;
   }
   if (b.standupTime !== undefined) {
-    const [hh, mm] = b.standupTime.split(":");
-    user.standupTime = `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+    const normalizedStandupTime = normalizeStandupTime(b.standupTime);
+    if (!normalizedStandupTime) {
+      throw new AppError(
+        422,
+        "VALIDATION_ERROR",
+        "standupTime must be HH:mm (e.g. 17:00)"
+      );
+    }
+    user.standupTime = normalizedStandupTime;
   }
   await user.save();
   res.json({ user: toPublicUser(user) });

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, getErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { Activity, ActivityListResponse } from "@/types/activity";
@@ -15,31 +16,50 @@ const inputClass = cn(
 );
 
 export function ActivityPanel() {
-  const [data, setData] = useState<ActivityListResponse | null>(null);
-  const [loading, setLoading] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isBlocker, setIsBlocker] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data: res } = await api.get<ActivityListResponse>("/api/activity/today");
-      setData(res);
-    } catch (e) {
-      setData(null);
-      setFormError(getErrorMessage(e, "Could not load activities"));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const queryClient = useQueryClient();
+  const activityQuery = useQuery({
+    queryKey: ["activity", "today"],
+    queryFn: async () => {
+      const { data } = await api.get<ActivityListResponse>("/api/activity/today");
+      return data;
+    },
+  });
+  const createMutation = useMutation({
+    mutationFn: async () =>
+      api.post("/api/activity", {
+        source: "manual",
+        type: "note",
+        title: title.trim(),
+        description: description.trim(),
+        url: "",
+        isBlocker,
+      }),
+    onSuccess: async () => {
+      setTitle("");
+      setDescription("");
+      setIsBlocker(false);
+      setFormError(null);
+      await queryClient.invalidateQueries({ queryKey: ["activity", "today"] });
+    },
+    onError: (err) => {
+      setFormError(getErrorMessage(err, "Could not save"));
+    },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => api.delete(`/api/activity/${id}`),
+    onSuccess: async () => {
+      setFormError(null);
+      await queryClient.invalidateQueries({ queryKey: ["activity", "today"] });
+    },
+    onError: (err) => {
+      setFormError(getErrorMessage(err, "Could not delete"));
+    },
+  });
+  const data = activityQuery.data ?? null;
 
   const bySource = useMemo(() => {
     if (!data?.activities) {
@@ -83,38 +103,12 @@ export function ActivityPanel() {
       setFormError("Add a short title for this activity.");
       return;
     }
-    setSaving(true);
-    try {
-      await api.post("/api/activity", {
-        source: "manual",
-        type: "note",
-        title: title.trim(),
-        description: description.trim(),
-        url: "",
-        isBlocker,
-      });
-      setTitle("");
-      setDescription("");
-      setIsBlocker(false);
-      await load();
-    } catch (err) {
-      setFormError(getErrorMessage(err, "Could not save"));
-    } finally {
-      setSaving(false);
-    }
+    await createMutation.mutateAsync();
   }
 
   async function onDelete(id: string) {
     setFormError(null);
-    setDeleting(id);
-    try {
-      await api.delete(`/api/activity/${id}`);
-      await load();
-    } catch (err) {
-      setFormError(getErrorMessage(err, "Could not delete"));
-    } finally {
-      setDeleting(null);
-    }
+    await deleteMutation.mutateAsync(id);
   }
 
   return (
@@ -176,17 +170,21 @@ export function ActivityPanel() {
         </label>
         <button
           type="submit"
-          disabled={saving}
+          disabled={createMutation.isPending}
           className="rounded-[10px] bg-terracotta px-4 py-2.5 text-sm font-medium text-ivory shadow-[0_0_0_1px_#c96442] disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Add to today"}
+          {createMutation.isPending ? "Saving…" : "Add to today"}
         </button>
       </form>
 
       <div>
         <h3 className="text-sm font-medium text-charcoal-warm">Feed (by source)</h3>
-        {loading ? (
+        {activityQuery.isPending ? (
           <p className="mt-2 text-sm text-olive-gray">Loading…</p>
+        ) : activityQuery.error ? (
+          <p className="mt-2 text-sm text-error-crimson">
+            {getErrorMessage(activityQuery.error, "Could not load activities")}
+          </p>
         ) : data && data.activities.length === 0 ? (
           <p className="mt-2 text-sm text-olive-gray">No activity yet. Add a line above.</p>
         ) : (
@@ -202,7 +200,7 @@ export function ActivityPanel() {
                       key={a.id}
                       activity={a}
                       onDelete={onDelete}
-                      busy={deleting === a.id}
+                      busy={deleteMutation.isPending && deleteMutation.variables === a.id}
                     />
                   ))}
                 </ul>

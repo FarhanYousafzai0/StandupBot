@@ -13,13 +13,13 @@ import {
   postToChannel,
   postToUserDirectMessage,
 } from "../services/slackMessage.service.js";
+import { isValidCalendarDate } from "../utils/validation.js";
 
 const putBodySchema = z.object({
   yesterday: z.string().max(50000).optional(),
   today: z.string().max(50000).optional(),
   blockers: z.string().max(50000).optional(),
   editedContent: z.string().max(100000).optional(),
-  status: z.enum(["draft", "sent"]).optional(),
 });
 
 const sendBodySchema = z.object({
@@ -81,6 +81,10 @@ export const generate = asyncHandler(async (req, res) => {
     const s = String(req.body.date);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) {
       throw new AppError(422, "VALIDATION_ERROR", "date must be YYYY-MM-DD");
+    }
+    const user = await loadUserOr404(req.userId);
+    if (!isValidCalendarDate(s, user.timezone)) {
+      throw new AppError(422, "VALIDATION_ERROR", "date must be a real calendar date");
     }
     ymd = s;
   } else {
@@ -161,6 +165,9 @@ export const update = asyncHandler(async (req, res) => {
     const first = parsed.error.issues[0];
     throw new AppError(422, "VALIDATION_ERROR", first?.message || "Invalid body");
   }
+  if (Object.keys(parsed.data).length === 0) {
+    throw new AppError(422, "VALIDATION_ERROR", "No valid standup fields to update");
+  }
 
   const docu = await Standup.findOne({ _id: id, userId: req.userId });
   if (!docu) {
@@ -180,10 +187,6 @@ export const update = asyncHandler(async (req, res) => {
   if (b.editedContent !== undefined) {
     docu.editedContent = b.editedContent;
   }
-  if (b.status !== undefined) {
-    docu.status = b.status;
-  }
-
   await docu.save();
   res.json({ standup: toPublicStandup(docu) });
 });

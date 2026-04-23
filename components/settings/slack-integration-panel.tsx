@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { api, getErrorMessage } from "@/lib/api";
+import { useRequireAuth } from "@/lib/auth-hooks";
 import { cn } from "@/lib/utils";
-import type { PublicIntegration, IntegrationsListResponse } from "@/types/integration";
+import type { IntegrationsListResponse } from "@/types/integration";
 
 const btn = cn(
   "rounded-[10px] px-4 py-2.5 text-sm font-medium transition",
@@ -16,75 +18,72 @@ const btnGhost = cn(
 
 export function SlackIntegrationPanel() {
   const searchParams = useSearchParams();
-  const [list, setList] = useState<PublicIntegration[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [action, setAction] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { hydrated, token } = useRequireAuth("/settings");
   const [banner, setBanner] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setError(null);
-    setLoading(true);
-    try {
+  const integrationsQuery = useQuery({
+    queryKey: ["integrations"],
+    enabled: hydrated && !!token,
+    queryFn: async () => {
       const { data } = await api.get<IntegrationsListResponse>("/api/integrations");
-      setList(data.integrations);
-    } catch (e) {
-      setList([]);
-      setError(getErrorMessage(e, "Could not load integrations"));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
+      return data.integrations;
+    },
+  });
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.get<{ url: string }>("/api/integrations/slack/authorize");
+      return data.url;
+    },
+    onSuccess: (url) => {
+      window.location.assign(url);
+    },
+  });
+  const disconnectMutation = useMutation({
+    mutationFn: async (id: string) => api.delete(`/api/integrations/${id}`),
+    onSuccess: async () => {
+      setBanner(null);
+      await queryClient.invalidateQueries({ queryKey: ["integrations"] });
+    },
+  });
+  const list = integrationsQuery.data ?? [];
+  const derivedBanner = useMemo(() => {
     if (searchParams.get("slack") === "connected") {
-      setBanner("Slack connected. You can send standups from the Standup page (DM) or a channel ID in the API body.");
+      return "Slack connected. You can send standups from the Standup page (DM) or a channel ID in the API body.";
     }
     const ge = searchParams.get("slack_error");
-    if (ge) {
-      setBanner(`Slack: ${ge}`);
-    }
+    return ge ? `Slack: ${ge}` : null;
   }, [searchParams]);
+  const action = connectMutation.isPending
+    ? "connecting"
+    : disconnectMutation.isPending
+      ? "disconnect"
+      : null;
+  const error = connectMutation.error || disconnectMutation.error || integrationsQuery.error;
 
   async function onConnect() {
-    setError(null);
-    setAction("connecting");
     try {
-      const { data } = await api.get<{ url: string }>(
-        "/api/integrations/slack/authorize"
-      );
-      window.location.assign(data.url);
-    } catch (e) {
-      setError(getErrorMessage(e, "Could not start Slack connection"));
-    } finally {
-      setAction(null);
-    }
+      await connectMutation.mutateAsync();
+    } catch {}
   }
 
   async function onDisconnect(id: string) {
     if (!window.confirm("Disconnect Slack?")) {
       return;
     }
-    setError(null);
-    setAction("disconnect");
     try {
-      await api.delete(`/api/integrations/${id}`);
-      setBanner(null);
-      await load();
-    } catch (e) {
-      setError(getErrorMessage(e, "Could not disconnect"));
-    } finally {
-      setAction(null);
-    }
+      await disconnectMutation.mutateAsync(id);
+    } catch {}
   }
 
   const sl = list.find((i) => i.platform === "slack");
 
-  if (loading) {
+  if (!hydrated) {
+    return <p className="text-sm text-olive-gray">Loading…</p>;
+  }
+  if (!token) {
+    return <p className="text-sm text-olive-gray">Redirecting…</p>;
+  }
+  if (integrationsQuery.isPending) {
     return <p className="text-sm text-olive-gray">Loading…</p>;
   }
 
@@ -100,14 +99,14 @@ export function SlackIntegrationPanel() {
         <code className="font-mono">users:read</code> (see README). Sending uses your DM by
         default.
       </p>
-      {banner ? (
+      {banner || derivedBanner ? (
         <p className="mt-3 text-sm text-charcoal-warm" role="status">
-          {banner}
+          {banner || derivedBanner}
         </p>
       ) : null}
       {error ? (
         <p className="mt-3 text-sm text-error-crimson" role="alert">
-          {error}
+          {getErrorMessage(error, "Could not load integrations")}
         </p>
       ) : null}
       <div className="mt-4 flex flex-wrap items-center gap-3">

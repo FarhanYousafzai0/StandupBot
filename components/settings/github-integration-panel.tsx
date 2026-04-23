@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { api, getErrorMessage } from "@/lib/api";
+import { useRequireAuth } from "@/lib/auth-hooks";
 import { cn } from "@/lib/utils";
-import type { PublicIntegration, IntegrationsListResponse } from "@/types/integration";
+import type { IntegrationsListResponse } from "@/types/integration";
 
 const btn = cn(
   "rounded-[10px] px-4 py-2.5 text-sm font-medium transition",
@@ -16,93 +18,91 @@ const btnGhost = cn(
 
 export function GitHubIntegrationPanel() {
   const searchParams = useSearchParams();
-  const [list, setList] = useState<PublicIntegration[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [action, setAction] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { hydrated, token } = useRequireAuth("/settings");
   const [banner, setBanner] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setError(null);
-    setLoading(true);
-    try {
+  const integrationsQuery = useQuery({
+    queryKey: ["integrations"],
+    enabled: hydrated && !!token,
+    queryFn: async () => {
       const { data } = await api.get<IntegrationsListResponse>("/api/integrations");
-      setList(data.integrations);
-    } catch (e) {
-      setList([]);
-      setError(getErrorMessage(e, "Could not load integrations"));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => {
+      return data.integrations;
+    },
+  });
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.get<{ url: string }>("/api/integrations/github/authorize");
+      return data.url;
+    },
+    onSuccess: (url) => {
+      window.location.assign(url);
+    },
+  });
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post<{ created: number }>("/api/integrations/github/sync");
+      return data;
+    },
+    onSuccess: async (data) => {
+      setBanner(`Synced. ${data.created} new activit${data.created === 1 ? "y" : "ies"}.`);
+      await queryClient.invalidateQueries({ queryKey: ["integrations"] });
+      await queryClient.invalidateQueries({ queryKey: ["activity", "today"] });
+    },
+  });
+  const disconnectMutation = useMutation({
+    mutationFn: async (id: string) => api.delete(`/api/integrations/${id}`),
+    onSuccess: async () => {
+      setBanner(null);
+      await queryClient.invalidateQueries({ queryKey: ["integrations"] });
+    },
+  });
+  const list = integrationsQuery.data ?? [];
+  const derivedBanner = useMemo(() => {
     if (searchParams.get("github") === "connected") {
-      setBanner("GitHub connected. You can sync to pull recent events into activity.");
+      return "GitHub connected. You can sync to pull recent events into activity.";
     }
     const ge = searchParams.get("github_error");
-    if (ge) {
-      setBanner(`GitHub error: ${ge}`);
-    }
+    return ge ? `GitHub error: ${ge}` : null;
   }, [searchParams]);
+  const action = connectMutation.isPending
+    ? "connecting"
+    : syncMutation.isPending
+      ? "syncing"
+      : disconnectMutation.isPending
+        ? "disconnect"
+        : null;
+  const error = connectMutation.error || syncMutation.error || disconnectMutation.error || integrationsQuery.error;
 
   async function onConnect() {
-    setError(null);
-    setAction("connecting");
     try {
-      const { data } = await api.get<{ url: string }>(
-        "/api/integrations/github/authorize"
-      );
-      window.location.assign(data.url);
-    } catch (e) {
-      setError(getErrorMessage(e, "Could not start GitHub connection"));
-    } finally {
-      setAction(null);
-    }
+      await connectMutation.mutateAsync();
+    } catch {}
   }
 
   async function onSync() {
-    setError(null);
-    setAction("syncing");
     try {
-      const { data } = await api.post<{ created: number }>(
-        "/api/integrations/github/sync"
-      );
-      setBanner(
-        `Synced. ${data.created} new activit${data.created === 1 ? "y" : "ies"}.`
-      );
-      await load();
-    } catch (e) {
-      setError(getErrorMessage(e, "Sync failed"));
-    } finally {
-      setAction(null);
-    }
+      await syncMutation.mutateAsync();
+    } catch {}
   }
 
   async function onDisconnect(id: string) {
     if (!window.confirm("Disconnect GitHub?")) {
       return;
     }
-    setError(null);
-    setAction("disconnect");
     try {
-      await api.delete(`/api/integrations/${id}`);
-      setBanner(null);
-      await load();
-    } catch (e) {
-      setError(getErrorMessage(e, "Could not disconnect"));
-    } finally {
-      setAction(null);
-    }
+      await disconnectMutation.mutateAsync(id);
+    } catch {}
   }
 
   const gh = list.find((i) => i.platform === "github");
 
-  if (loading) {
+  if (!hydrated) {
+    return <p className="text-sm text-olive-gray">Loading integrations…</p>;
+  }
+  if (!token) {
+    return <p className="text-sm text-olive-gray">Redirecting…</p>;
+  }
+  if (integrationsQuery.isPending) {
     return <p className="text-sm text-olive-gray">Loading integrations…</p>;
   }
 
@@ -116,9 +116,9 @@ export function GitHubIntegrationPanel() {
         Connect with OAuth, then we import public activity (pushes, PRs, issues) as
         standup context. Runs hourly, or use Sync.
       </p>
-      {banner ? (
+      {banner || derivedBanner ? (
         <p className="mt-3 text-sm text-charcoal-warm" role="status">
-          {banner}
+          {banner || derivedBanner}
         </p>
       ) : null}
       {error ? (
@@ -126,7 +126,7 @@ export function GitHubIntegrationPanel() {
           className="mt-3 text-sm text-error-crimson"
           role="alert"
         >
-          {error}
+          {getErrorMessage(error, "Could not load integrations")}
         </p>
       ) : null}
       <div className="mt-4 flex flex-wrap items-center gap-3">

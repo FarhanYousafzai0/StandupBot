@@ -6,8 +6,8 @@ export default function StandupPage() {
       <header>
         <h1 className="font-display text-3xl text-near-black">Standup</h1>
         <p className="mt-2 text-olive-gray">
-          Generate a draft with <strong>OpenAI</strong> from today&apos;s activity, edit, then save. Slack
-          in Phase 7.
+          Generate a draft with <strong>OpenAI</strong> from today&apos;s activity, edit it, save changes,
+          and send the final version to Slack.
         </p>
       </header>
       <StandupPageClient />

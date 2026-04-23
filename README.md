@@ -17,7 +17,7 @@ Implemented today:
 - JWT auth with register, login, and profile fetch
 - Manual activity CRUD scoped to the signed-in user
 - Timezone-aware "today" activity queries
-- OpenAI-powered standup draft generation and editing
+- OpenAI-powered standup draft generation, editing, and Slack send
 - Warm Claude-inspired UI system defined in `DESIGN.md`
 
 Planned next:
@@ -85,9 +85,17 @@ Backend:
 3. Optionally set:
    - `MONGODB_URI_DIRECT` if SRV resolution fails
    - `OPENAI_MODEL` to override the default `gpt-4o-mini`
-   - `API_PUBLIC_URL` (default `http://localhost:5000`) — must match the URLs you register in GitHub and Slack
-   - `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` — **Connect GitHub**; callback: `${API_PUBLIC_URL}/api/integrations/github/callback`
-   - `SLACK_CLIENT_ID` and `SLACK_CLIENT_SECRET` — **Connect Slack**; redirect URL: `${API_PUBLIC_URL}/api/integrations/slack/callback` — in the Slack app, set **Bot token scopes** to `chat:write`, `im:write`, and `users:read`
+4. For **GitHub** and **Slack** integrations, set the variables below. Full step-by-step comments live in `apps/api/.env.example`.
+
+#### GitHub and Slack (OAuth) secrets
+
+| Variable | Where it comes from |
+|----------|----------------------|
+| `API_PUBLIC_URL` | Base URL of this API (e.g. `http://localhost:5000` locally, `https://…` in production). Must match the host used in every OAuth callback URL. |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | [GitHub → Settings → Developer settings → OAuth Apps](https://github.com/settings/developers). New OAuth app: callback URL = `{API_PUBLIC_URL}/api/integrations/github/callback` (example: `http://localhost:5000/api/integrations/github/callback`). |
+| `SLACK_CLIENT_ID` / `SLACK_CLIENT_SECRET` | [Slack API](https://api.slack.com/apps) → your app → **OAuth & Permissions** → **Redirect URL** = `{API_PUBLIC_URL}/api/integrations/slack/callback`. **Bot token scopes** at least: `chat:write`, `im:write`, `users:read`. |
+
+No extra secrets are required in the frontend for OAuth: the browser hits the API; tokens stay on the server. Use `.env.local` only for `NEXT_PUBLIC_API_URL` as described above.
 
 ## Run The Project
 
@@ -167,7 +175,7 @@ Integrations (auth):
 
 - `today` is based on the user's local calendar day, not just server time
 - With GitHub connected, recent events are also ingested (hourly; use **Sync now** in Settings to force)
-- Slack send is not implemented yet; see `IMPLEMENTATION_PLAN.md` Phase 7
+- With Slack connected, standups can be sent from the Standup page via DM; the API also supports sending to a specific channel ID
 
 ## Suggested GitHub Description
 
