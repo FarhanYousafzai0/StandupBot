@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["127.0.0.1"],
   /**
    * In dev, the browser only talks to Next (3000). /api is proxied to Express (5000),
    * avoiding CORS and ERR_CONNECTION_REFUSED when the user does not call :5000 directly.
